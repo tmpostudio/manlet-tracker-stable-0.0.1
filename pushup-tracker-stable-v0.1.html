@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pushup Tracker V2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #root {
+            width: 100%;
+            height: 100vh;
+            max-width: 430px;
+            max-height: 932px;
+            position: relative;
+            background: #000;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        @media (max-width: 430px) {
+            #root {
+                max-width: 100%;
+                max-height: 100vh;
+            }
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+            pointer-events: none;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .timer-box {
+            margin-top: 2rem;
+            background: rgba(0,0,0,0.7);
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            text-align: center;
+        }
+
+        .timer-label {
+            color: white;
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+
+        .timer-value {
+            color: white;
+            font-size: 2.5rem;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .middle-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .count-label {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+        }
+
+        .count-value {
+            color: white;
+            font-size: 5rem;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 1rem;
+        }
+
+        .feedback-box {
+            background: rgba(0,0,0,0.7);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            max-width: 20rem;
+            text-align: center;
+        }
+
+        .feedback-text {
+            color: white;
+            font-size: 1.125rem;
+            font-weight: 500;
+        }
+
+        .feedback-box.good {
+            background: rgba(0,255,100,0.3);
+        }
+
+        .feedback-box.bad {
+            background: rgba(255,50,50,0.3);
+        }
+
+        .hold-time-box {
+            background: rgba(0,0,0,0.7);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            pointer-events: auto;
+        }
+
+        .hold-time-label {
+            color: white;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .hold-time-slider {
+            width: 12rem;
+        }
+
+        .controls {
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            pointer-events: auto;
+        }
+
+        button {
+            padding: 1rem 2rem;
+            border-radius: 9999px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.2s;
+        }
+
+        .btn-gray {
+            background: rgba(75,85,99,0.8);
+            color: white;
+        }
+
+        .btn-gray:hover {
+            background: rgba(55,65,81,0.9);
+        }
+
+        .btn-red {
+            background: rgba(220,38,38,0.8);
+            color: white;
+        }
+
+        .btn-red:hover {
+            background: rgba(185,28,28,0.9);
+        }
+
+        .btn-red.active {
+            background: rgba(34,197,94,0.8);
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="video-container">
+            <video id="video" playsinline autoplay></video>
+            <canvas id="canvas"></canvas>
+
+            <div class="overlay">
+                <!-- Top: Timer -->
+                <div class="timer-box">
+                    <div class="timer-label">TIME</div>
+                    <div class="timer-value" id="timer">0:60</div>
+                </div>
+
+                <!-- Middle: Count + Feedback -->
+                <div class="middle-section">
+                    <div class="count-label">TOTAL PUSHUPS</div>
+                    <div class="count-value" id="count">0</div>
+                    
+                    <div class="feedback-box" id="feedback">
+                        <div class="feedback-text" id="feedbackText">Position yourself for pushups</div>
+                    </div>
+
+                    <!-- Debug Panel -->
+                    <div class="hold-time-box" id="debugBox">
+                        <div style="color: white; font-size: 0.75rem; font-family: monospace; text-align: left; line-height: 1.5;">
+                            <div><span style="display: inline-block; width: 90px;">L Elbow:</span><span id="debugLeftElbow">--</span></div>
+                            <div><span style="display: inline-block; width: 90px;">R Elbow:</span><span id="debugRightElbow">--</span></div>
+                            <div><span style="display: inline-block; width: 90px;">Avg:</span><span id="debugAvgElbow">--</span></div>
+                            <div><span style="display: inline-block; width: 90px;">Plank:</span><span id="debugPlank">--</span></div>
+                            <div><span style="display: inline-block; width: 90px;">Wrists:</span><span id="debugWrists">--</span></div>
+                            <div><span style="display: inline-block; width: 90px;">State:</span><span id="debugState">--</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom: Controls -->
+                <div class="controls" style="flex-direction: column; gap: 0.5rem;">
+                    <!-- ANON Toggle -->
+                    <button class="btn-gray" id="anonBtn" style="pointer-events: auto;">ANON</button>
+                    
+                    <!-- Main Controls -->
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn-gray" id="toggleBtn">TOGGLE</button>
+                        <button class="btn-gray" id="resetBtn">RESET</button>
+                        <button class="btn-red" id="startBtn">START</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TensorFlow.js and MoveNet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.0"></script>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            ELBOW_ANGLE_DOWN: 90,
+            ELBOW_ANGLE_UP: 160,
+            MIN_CONFIDENCE: 0.3,
+            WRIST_SYMMETRY_CM: 15,
+            PLANK_SHOULDER_WIDTH_MULTIPLIER: 1.5, // wrist-to-hip distance must be less than 1.5x shoulder width
+            FEEDBACK_DEBOUNCE_MS: 100, // delay before changing feedback state
+            SESSION_DURATION: 60
+        };
+
+        // State
+        let detector = null;
+        let video = null;
+        let canvas = null;
+        let ctx = null;
+        let isRunning = false;
+        let sessionActive = false;
+        let repCount = 0;
+        let currentState = 'none'; // 'none', 'up', 'down'
+        let lastTopTime = 0;
+        let lastBottomTime = 0;
+        let holdTime = 0;
+        let startTime = null;
+        let timerInterval = null;
+        let showHoldToggle = true;
+        let videoScale = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1 };
+        let lastFeedbackChange = 0;
+        let pendingFeedback = null;
+        let anonMode = false;
+        let anonImage = null;
+        let smoothedFaceSize = null;
+        let smoothedFacePosition = { x: null, y: null };
+
+        // Calculate video scaling for object-fit: cover
+        function calculateVideoScale() {
+            const videoAspect = video.videoWidth / video.videoHeight;
+            const containerAspect = canvas.width / canvas.height;
+
+            let renderWidth, renderHeight, offsetX, offsetY;
+
+            if (videoAspect > containerAspect) {
+                // Video is wider - crop left/right
+                renderHeight = canvas.height;
+                renderWidth = video.videoWidth * (canvas.height / video.videoHeight);
+                offsetX = (canvas.width - renderWidth) / 2;
+                offsetY = 0;
+            } else {
+                // Video is taller - crop top/bottom
+                renderWidth = canvas.width;
+                renderHeight = video.videoHeight * (canvas.width / video.videoWidth);
+                offsetX = 0;
+                offsetY = (canvas.height - renderHeight) / 2;
+            }
+
+            return {
+                offsetX: offsetX,
+                offsetY: offsetY,
+                scaleX: renderWidth / video.videoWidth,
+                scaleY: renderHeight / video.videoHeight
+            };
+        }
+
+        // Initialize
+        async function init() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+
+            // Setup video
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                video.srcObject = stream;
+                
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        
+                        // Set canvas to match container dimensions
+                        const container = document.querySelector('.video-container');
+                        canvas.width = container.clientWidth;
+                        canvas.height = container.clientHeight;
+                        
+                        // Calculate video scaling
+                        videoScale = calculateVideoScale();
+                        console.log('Video scale:', videoScale);
+                        
+                        resolve();
+                    };
+                });
+
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                updateFeedback('Camera access denied', 'bad');
+                return;
+            }
+
+            // Load MoveNet model
+            try {
+                updateFeedback('Loading AI model...', '');
+                
+                await tf.ready();
+                console.log('TensorFlow.js ready! Backend:', tf.getBackend());
+                
+                detector = await poseDetection.createDetector(
+                    poseDetection.SupportedModels.MoveNet,
+                    {
+                        modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
+                    }
+                );
+                console.log('MoveNet model loaded!');
+                
+                // Load avatar image for ANON mode
+                anonImage = new Image();
+                anonImage.crossOrigin = 'anonymous';
+                anonImage.src = 'https://cdn.prod.website-files.com/62d1b7c0c4ee9be60d160b8c/6365732401421e7c0792233e_utility-welcome-home.svg';
+                anonImage.onload = () => console.log('ANON avatar loaded');
+                anonImage.onerror = () => console.error('Failed to load ANON avatar');
+                
+                updateFeedback('Position yourself for pushups', '');
+                isRunning = true;
+                detectPose();
+            } catch (err) {
+                console.error('Error loading model:', err);
+                updateFeedback('Failed to load model', 'bad');
+            }
+        }
+
+        // Main pose detection loop
+        async function detectPose() {
+            if (!isRunning) return;
+
+            try {
+                const poses = await detector.estimatePoses(video);
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (poses && poses.length > 0) {
+                    const pose = poses[0];
+                    drawSkeleton(pose.keypoints);
+                    
+                    if (sessionActive) {
+                        analyzePushUp(pose.keypoints);
+                    }
+                }
+            } catch (err) {
+                console.error('Detection error:', err);
+            }
+
+            requestAnimationFrame(detectPose);
+        }
+
+        // Calculate distance between two points
+        function calculateDistance(p1, p2) {
+            return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        }
+
+        // Calculate angle between three points
+        function calculateAngle(pointA, pointB, pointC) {
+            const radians = Math.atan2(pointC.y - pointB.y, pointC.x - pointB.x) -
+                          Math.atan2(pointA.y - pointB.y, pointA.x - pointB.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            
+            if (angle > 180.0) {
+                angle = 360.0 - angle;
+            }
+            
+            return angle;
+        }
+
+        // Check wrist symmetry (±15cm tolerance)
+        function checkWristSymmetry(keypoints) {
+            const leftWrist = keypoints[9];
+            const rightWrist = keypoints[10];
+            const leftShoulder = keypoints[5];
+            const rightShoulder = keypoints[6];
+
+            if (leftWrist.score < CONFIG.MIN_CONFIDENCE || 
+                rightWrist.score < CONFIG.MIN_CONFIDENCE ||
+                leftShoulder.score < CONFIG.MIN_CONFIDENCE ||
+                rightShoulder.score < CONFIG.MIN_CONFIDENCE) {
+                return false;
+            }
+
+            // Calculate vertical distance of each wrist from its shoulder
+            const leftWristHeight = Math.abs(leftWrist.y - leftShoulder.y);
+            const rightWristHeight = Math.abs(rightWrist.y - rightShoulder.y);
+            
+            // Convert to approximate cm (shoulder width ~40cm)
+            const shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
+            const cmPerUnit = 40 / shoulderWidth;
+            
+            const heightDiff = Math.abs(leftWristHeight - rightWristHeight) * cmPerUnit;
+            
+            return heightDiff <= CONFIG.WRIST_SYMMETRY_CM;
+        }
+
+        // Check plank position - check BOTH sides: left wrist to left hip, right wrist to right hip
+        function checkPlankPosition(keypoints) {
+            const leftWrist = keypoints[9];
+            const rightWrist = keypoints[10];
+            const leftShoulder = keypoints[5];
+            const rightShoulder = keypoints[6];
+            const leftHip = keypoints[11];
+            const rightHip = keypoints[12];
+
+            // Check confidence
+            const minConf = CONFIG.MIN_CONFIDENCE;
+            if (leftWrist.score < minConf || rightWrist.score < minConf ||
+                leftShoulder.score < minConf || rightShoulder.score < minConf ||
+                leftHip.score < minConf || rightHip.score < minConf) {
+                return { valid: false, reason: 'body parts not detected' };
+            }
+
+            // Calculate shoulder width as reference
+            const shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
+            const threshold = shoulderWidth * CONFIG.PLANK_SHOULDER_WIDTH_MULTIPLIER;
+            
+            // Check LEFT side: left wrist to left hip
+            const leftDistance = calculateDistance(leftWrist, leftHip);
+            const leftRatio = leftDistance / shoulderWidth;
+            
+            // Check RIGHT side: right wrist to right hip
+            const rightDistance = calculateDistance(rightWrist, rightHip);
+            const rightRatio = rightDistance / shoulderWidth;
+            
+            // BOTH sides must be within threshold
+            if (leftDistance > threshold || rightDistance > threshold) {
+                return { 
+                    valid: false, 
+                    reason: `not plank L:${leftRatio.toFixed(1)}x R:${rightRatio.toFixed(1)}x` 
+                };
+            }
+
+            return { valid: true, reason: `good L:${leftRatio.toFixed(1)}x R:${rightRatio.toFixed(1)}x` };
+        }
+
+        // Analyze pose for pushup counting
+        function analyzePushUp(keypoints) {
+            const leftShoulder = keypoints[5];
+            const rightShoulder = keypoints[6];
+            const leftElbow = keypoints[7];
+            const rightElbow = keypoints[8];
+            const leftWrist = keypoints[9];
+            const rightWrist = keypoints[10];
+
+            // Check confidence
+            const minConf = CONFIG.MIN_CONFIDENCE;
+            if (leftShoulder.score < minConf || rightShoulder.score < minConf ||
+                leftElbow.score < minConf || rightElbow.score < minConf ||
+                leftWrist.score < minConf || rightWrist.score < minConf) {
+                setDebouncedFeedback('Body not detected', 'bad');
+                return;
+            }
+
+            // CRITICAL: Check that wrists are BELOW shoulders (proper pushup orientation)
+            // In screen coordinates, Y increases downward, so wrist.y should be > shoulder.y
+            const avgWristY = (leftWrist.y + rightWrist.y) / 2;
+            const avgShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+            
+            if (avgWristY < avgShoulderY) {
+                // Wrists are above shoulders - standing position, not pushup
+                setDebouncedFeedback('Wrong orientation', 'bad');
+                return;
+            }
+
+            // CRITICAL: Check shoulder-hip alignment (prevent standing)
+            // In plank position, shoulders and hips should be at similar Y positions (horizontal body)
+            // When standing, hips are much lower than shoulders (vertical body)
+            const leftHip = keypoints[11];
+            const rightHip = keypoints[12];
+            
+            if (leftHip.score >= minConf && rightHip.score >= minConf) {
+                const avgHipY = (leftHip.y + rightHip.y) / 2;
+                const shoulderWidth = calculateDistance(leftShoulder, rightShoulder);
+                const shoulderHipVerticalDiff = Math.abs(avgHipY - avgShoulderY);
+                
+                // If hips are too far below shoulders (more than 1.5x shoulder width), reject
+                if (shoulderHipVerticalDiff > shoulderWidth * 1.5) {
+                    setDebouncedFeedback('Standing detected', 'bad');
+                    return;
+                }
+            }
+
+            // Calculate elbow angles
+            const leftElbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
+            const rightElbowAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+            const avgElbowAngle = (leftElbowAngle + rightElbowAngle) / 2;
+
+            // Update debug display
+            document.getElementById('debugLeftElbow').textContent = `${leftElbowAngle.toFixed(1)}°`;
+            document.getElementById('debugRightElbow').textContent = `${rightElbowAngle.toFixed(1)}°`;
+            document.getElementById('debugAvgElbow').textContent = `${avgElbowAngle.toFixed(1)}°`;
+            document.getElementById('debugState').textContent = `${currentState}`;
+
+            // Check plank position
+            const plankCheck = checkPlankPosition(keypoints);
+            document.getElementById('debugPlank').textContent = `${plankCheck.reason}`;
+            
+            if (!plankCheck.valid) {
+                setDebouncedFeedback('Form: Bad', 'bad');
+                return;
+            }
+
+            // Check wrist symmetry
+            const wristsSymmetrical = checkWristSymmetry(keypoints);
+            document.getElementById('debugWrists').textContent = `${wristsSymmetrical ? 'good' : 'uneven'}`;
+            
+            if (!wristsSymmetrical) {
+                setDebouncedFeedback('Wrists uneven', 'bad');
+                return;
+            }
+
+            const currentTime = Date.now();
+
+            // State machine for rep counting
+            if (avgElbowAngle > CONFIG.ELBOW_ANGLE_UP) {
+                // UP position
+                if (currentState === 'down') {
+                    const timeAtBottom = currentTime - lastBottomTime;
+                    if (timeAtBottom >= holdTime) {
+                        // Valid rep completed
+                        repCount++;
+                        updateCount();
+                        setDebouncedFeedback('Form: Good ✓', 'good');
+                        console.log('✓ REP COUNTED! Total:', repCount);
+                    }
+                }
+                currentState = 'up';
+                lastTopTime = currentTime;
+            } else if (avgElbowAngle < CONFIG.ELBOW_ANGLE_DOWN) {
+                // DOWN position
+                if (currentState === 'up') {
+                    const timeAtTop = currentTime - lastTopTime;
+                    if (timeAtTop >= holdTime) {
+                        currentState = 'down';
+                        lastBottomTime = currentTime;
+                        setDebouncedFeedback('Form: Good', 'good');
+                    }
+                } else if (currentState === 'none') {
+                    currentState = 'down';
+                    lastBottomTime = currentTime;
+                }
+            } else {
+                // Transition
+                if (currentState !== 'none') {
+                    setDebouncedFeedback('Form: Good', 'good');
+                }
+            }
+        }
+
+        // Draw skeleton
+        function drawSkeleton(keypoints) {
+            // Use the calculated video scale
+            const { offsetX, offsetY, scaleX, scaleY } = videoScale;
+            
+            const connections = [
+                [5, 7], [7, 9],   // Left arm
+                [6, 8], [8, 10],  // Right arm
+                [5, 6],           // Shoulders
+                [5, 11], [6, 12], // Torso
+                [11, 12],         // Hips
+                [11, 13], [13, 15], // Left leg
+                [12, 14], [14, 16]  // Right leg
+            ];
+
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 3;
+            
+            connections.forEach(([i, j]) => {
+                const kp1 = keypoints[i];
+                const kp2 = keypoints[j];
+                
+                if (kp1.score > CONFIG.MIN_CONFIDENCE && kp2.score > CONFIG.MIN_CONFIDENCE) {
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        offsetX + kp1.x * scaleX, 
+                        offsetY + kp1.y * scaleY
+                    );
+                    ctx.lineTo(
+                        offsetX + kp2.x * scaleX, 
+                        offsetY + kp2.y * scaleY
+                    );
+                    ctx.stroke();
+                }
+            });
+
+            ctx.fillStyle = '#00ff88';
+            keypoints.forEach(kp => {
+                if (kp.score > CONFIG.MIN_CONFIDENCE) {
+                    ctx.beginPath();
+                    ctx.arc(
+                        offsetX + kp.x * scaleX, 
+                        offsetY + kp.y * scaleY, 
+                        6, 0, 2 * Math.PI
+                    );
+                    ctx.fill();
+                }
+            });
+            
+            // Draw ANON avatar over face if enabled
+            if (anonMode && anonImage && anonImage.complete) {
+                const nose = keypoints[0];
+                const leftShoulder = keypoints[5];
+                const rightShoulder = keypoints[6];
+                
+                // Check if face keypoints are detected
+                if (nose.score > CONFIG.MIN_CONFIDENCE && 
+                    leftShoulder.score > CONFIG.MIN_CONFIDENCE && 
+                    rightShoulder.score > CONFIG.MIN_CONFIDENCE) {
+                    
+                    // Calculate face width based on shoulder width
+                    const shoulderDistance = calculateDistance(leftShoulder, rightShoulder);
+                    const targetFaceWidth = shoulderDistance * scaleX * 0.5;
+                    
+                    // Calculate nose position
+                    const targetNoseX = offsetX + nose.x * scaleX;
+                    const targetNoseY = offsetY + nose.y * scaleY;
+                    
+                    // Smooth the values using exponential moving average
+                    const smoothingFactor = 0.3; // Lower = smoother but more lag
+                    
+                    if (smoothedFaceSize === null) {
+                        // Initialize on first detection
+                        smoothedFaceSize = targetFaceWidth;
+                        smoothedFacePosition.x = targetNoseX;
+                        smoothedFacePosition.y = targetNoseY;
+                    } else {
+                        // Apply smoothing
+                        smoothedFaceSize = smoothedFaceSize * (1 - smoothingFactor) + targetFaceWidth * smoothingFactor;
+                        smoothedFacePosition.x = smoothedFacePosition.x * (1 - smoothingFactor) + targetNoseX * smoothingFactor;
+                        smoothedFacePosition.y = smoothedFacePosition.y * (1 - smoothingFactor) + targetNoseY * smoothingFactor;
+                    }
+                    
+                    const faceWidth = smoothedFaceSize;
+                    const faceHeight = faceWidth; // Keep square aspect ratio
+                    
+                    // Draw avatar centered on smoothed nose position
+                    ctx.save();
+                    ctx.drawImage(
+                        anonImage,
+                        smoothedFacePosition.x - faceWidth / 2,
+                        smoothedFacePosition.y - faceHeight / 2,
+                        faceWidth,
+                        faceHeight
+                    );
+                    ctx.restore();
+                }
+            }
+        }
+
+        // UI Updates
+        function setDebouncedFeedback(text, type) {
+            const currentTime = Date.now();
+            
+            // If same feedback, update immediately
+            const currentFeedback = document.getElementById('feedbackText').textContent;
+            if (currentFeedback === text) {
+                return;
+            }
+            
+            // Store pending feedback
+            pendingFeedback = { text, type, time: currentTime };
+            
+            // If enough time has passed since last change, update immediately
+            if (currentTime - lastFeedbackChange > CONFIG.FEEDBACK_DEBOUNCE_MS) {
+                updateFeedback(text, type);
+                lastFeedbackChange = currentTime;
+                pendingFeedback = null;
+            }
+            // Otherwise wait for debounce
+            else {
+                setTimeout(() => {
+                    if (pendingFeedback && pendingFeedback.text === text) {
+                        updateFeedback(text, type);
+                        lastFeedbackChange = Date.now();
+                        pendingFeedback = null;
+                    }
+                }, CONFIG.FEEDBACK_DEBOUNCE_MS);
+            }
+        }
+
+        function updateCount() {
+            document.getElementById('count').textContent = repCount;
+        }
+
+        function updateFeedback(text, type) {
+            const feedbackBox = document.getElementById('feedback');
+            const feedbackText = document.getElementById('feedbackText');
+            
+            feedbackText.textContent = text;
+            feedbackBox.className = 'feedback-box ' + type;
+        }
+
+        function updateTimer() {
+            if (!startTime) return;
+            
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const remaining = Math.max(0, CONFIG.SESSION_DURATION - elapsed);
+            
+            const minutes = Math.floor(remaining / 60);
+            const seconds = remaining % 60;
+            document.getElementById('timer').textContent = 
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (remaining === 0) {
+                endSession();
+            }
+        }
+
+        // Session controls
+        function startSession() {
+            sessionActive = true;
+            repCount = 0;
+            currentState = 'none';
+            lastTopTime = 0;
+            lastBottomTime = 0;
+            startTime = Date.now();
+            updateCount();
+            updateFeedback('Get in position!', '');
+            
+            timerInterval = setInterval(updateTimer, 1000);
+            document.getElementById('startBtn').textContent = 'ACTIVE';
+            document.getElementById('startBtn').classList.add('active');
+        }
+
+        function endSession() {
+            sessionActive = false;
+            clearInterval(timerInterval);
+            document.getElementById('startBtn').textContent = 'START';
+            document.getElementById('startBtn').classList.remove('active');
+            updateFeedback(`Session Complete! ${repCount} reps`, 'good');
+        }
+
+        function resetSession() {
+            sessionActive = false;
+            clearInterval(timerInterval);
+            repCount = 0;
+            currentState = 'none';
+            lastTopTime = 0;
+            lastBottomTime = 0;
+            startTime = null;
+            updateCount();
+            updateFeedback('Position yourself for pushups', '');
+            document.getElementById('startBtn').textContent = 'START';
+            document.getElementById('startBtn').classList.remove('active');
+            document.getElementById('timer').textContent = '0:60';
+        }
+
+        function toggleHoldTime() {
+            showHoldToggle = !showHoldToggle;
+            document.getElementById('debugBox').style.display = 
+                showHoldToggle ? 'block' : 'none';
+        }
+
+        function toggleAnon() {
+            anonMode = !anonMode;
+            const btn = document.getElementById('anonBtn');
+            if (anonMode) {
+                btn.classList.remove('btn-gray');
+                btn.classList.add('btn-red');
+                btn.textContent = 'ANON ON';
+            } else {
+                btn.classList.remove('btn-red');
+                btn.classList.add('btn-gray');
+                btn.textContent = 'ANON';
+                // Reset smoothing values
+                smoothedFaceSize = null;
+                smoothedFacePosition = { x: null, y: null };
+            }
+        }
+
+        // Event listeners
+        document.getElementById('startBtn').addEventListener('click', startSession);
+        document.getElementById('resetBtn').addEventListener('click', resetSession);
+        document.getElementById('toggleBtn').addEventListener('click', toggleHoldTime);
+        document.getElementById('anonBtn').addEventListener('click', toggleAnon);
+
+        // Start
+        init();
+    </script>
+</body>
+</html>

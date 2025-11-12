@@ -1,0 +1,92 @@
+# Pushup Tracker v0.1 - Anti-Cheat Constraints
+
+## Final Implemented Constraints
+
+### 1. Wrist Symmetry Check
+- **Constraint**: Both wrists must be at similar vertical heights (±15cm tolerance)
+- **Purpose**: Prevents one-arm pushups or asymmetric movements from counting
+- **Implementation**: Calculates vertical distance difference between left and right wrists, normalized using shoulder width as reference (40cm assumed shoulder width)
+- **Fail Message**: "Wrists uneven"
+
+### 2. Plank Position Detection (Wrist-to-Hip Distance)
+- **Constraint**: Distance from each wrist to its corresponding hip must be ≤ 1.5x shoulder width
+- **Purpose**: Ensures user is in a plank-like position with body extended
+- **Implementation**: 
+  - Measures Euclidean distance: left wrist → left hip, right wrist → right hip
+  - Uses shoulder width as proportional reference (scales with body size and camera distance)
+  - Both sides must pass independently
+- **Fail Message**: "Form: Bad"
+- **Debug Output**: Shows ratios like "L:1.2x R:1.3x"
+
+### 3. Proper Orientation Check (Wrists Below Shoulders)
+- **Constraint**: Wrists must be positioned below shoulders in screen coordinates
+- **Purpose**: Prevents inverted movements (e.g., standing with hands raised touching shoulders)
+- **Implementation**: Compares average Y-coordinates (Y increases downward in screen space)
+- **Fail Message**: "Wrong orientation"
+
+### 4. Standing Detection (Shoulder-Hip Alignment)
+- **Constraint**: Vertical distance between shoulders and hips must be ≤ 1.5x shoulder width
+- **Purpose**: Prevents standing positions from being counted as valid pushups
+- **Implementation**: 
+  - In proper plank: shoulders and hips are roughly horizontal (similar Y values)
+  - When standing: hips drop significantly below shoulders (large Y difference)
+  - Rejects if vertical separation exceeds threshold
+- **Fail Message**: "Standing detected"
+
+### 5. Elbow Angle Thresholds
+- **Up Position**: Average elbow angle > 160°
+- **Down Position**: Average elbow angle < 90°
+- **Purpose**: Defines valid range of motion for pushup rep counting
+- **Implementation**: Calculates angle at elbow joint using shoulder-elbow-wrist keypoints
+
+## Technical Implementation Details
+
+### Coordinate System
+- Uses TensorFlow.js MoveNet model for pose detection
+- Keypoints are normalized coordinates (0-1 range)
+- Proper scaling accounts for `object-fit: cover` video rendering
+
+### Keypoint Alignment Solution
+**CRITICAL**: Canvas coordinates must account for video cropping:
+```javascript
+// Calculate video scale for object-fit: cover
+const videoAspect = video.videoWidth / video.videoHeight;
+const containerAspect = canvas.width / canvas.height;
+// Apply offset + scale to map keypoints to actual video position
+offsetX + keypoint.x * scaleX
+offsetY + keypoint.y * scaleY
+```
+
+### Proportional Measurements
+All distance-based constraints use **shoulder width as the reference unit** to ensure:
+- Measurements scale with body size
+- System works at any camera distance
+- No hard-coded pixel values that break with different setups
+
+### Feedback Debouncing
+- 100ms debounce on feedback state changes
+- Prevents jittery UI when user is on threshold of passing/failing constraint
+- Debug panel updates in real-time without debounce
+
+## Configuration Values
+```javascript
+ELBOW_ANGLE_DOWN: 90°
+ELBOW_ANGLE_UP: 160°
+MIN_CONFIDENCE: 0.3
+WRIST_SYMMETRY_CM: 15
+PLANK_SHOULDER_WIDTH_MULTIPLIER: 1.5
+FEEDBACK_DEBOUNCE_MS: 100
+SESSION_DURATION: 60 seconds
+```
+
+## Session Flow
+1. User positions themselves in plank position
+2. Clicks START - 60 second timer begins
+3. Timer never stops - bad form reps simply don't count
+4. All constraints checked per frame during active session
+5. Rep counted only when transitioning from valid down position to valid up position with all constraints satisfied
+
+## Future Considerations
+- Constraints can be tuned by adjusting multiplier values
+- Debug panel allows real-time monitoring of all constraint values
+- System designed for front-facing camera view
