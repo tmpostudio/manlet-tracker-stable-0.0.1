@@ -72,6 +72,7 @@
             justify-content: space-between;
             align-items: center;
             pointer-events: none;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
         }
 
         .timer-box {
@@ -234,7 +235,7 @@
                 </div>
 
                 <!-- Bottom: Controls -->
-                <div class="controls" style="flex-direction: column; gap: 0.5rem; margin-bottom: calc(2rem + env(safe-area-inset-bottom));">
+                <div class="controls" style="flex-direction: column; gap: 0.5rem; margin-bottom: 2rem;">
                     <!-- ANON Toggle -->
                     <button class="btn-gray" id="anonBtn" style="pointer-events: auto;">ANON</button>
                     
@@ -843,4 +844,3 @@
     </script>
 </body>
 </html>
-
