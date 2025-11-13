@@ -158,7 +158,6 @@
         }
 
         .controls {
-            margin-bottom: 2rem;
             display: flex;
             gap: 1rem;
             pointer-events: auto;
@@ -235,7 +234,7 @@
                 </div>
 
                 <!-- Bottom: Controls -->
-                <div class="controls" style="flex-direction: column; gap: 0.5rem;">
+                <div class="controls" style="flex-direction: column; gap: 0.5rem; margin-bottom: calc(2rem + env(safe-area-inset-bottom));">
                     <!-- ANON Toggle -->
                     <button class="btn-gray" id="anonBtn" style="pointer-events: auto;">ANON</button>
                     
@@ -844,3 +843,4 @@
     </script>
 </body>
 </html>
+
